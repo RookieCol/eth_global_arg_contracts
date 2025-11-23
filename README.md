@@ -2,6 +2,9 @@
 
 **Zero-friction cross-chain transfers powered by Permit2 + LayerZero**
 
+> ✅ **TESTED & WORKING** - Multiple successful cross-chain transfers on testnet  
+> 📝 [View Test Results](./SUCCESSFUL_TESTS.md) | 🔗 [Live TX #1](https://sepolia.etherscan.io/tx/0xefc10405959878d8a2778ad78c79abecc82b2d25d27817a1ccb862d9a42fbacb) | [Live TX #2](https://sepolia.etherscan.io/tx/0x8be93145510e0af4f2bdbbfed84df035ef5ebbb9b76cc5c0cdb19d3ac66be21d)
+
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.28-blue)](https://soliditylang.org/)
 [![LayerZero](https://img.shields.io/badge/LayerZero-V2-purple)](https://layerzero.network/)
 [![Permit2](https://img.shields.io/badge/Permit2-Uniswap-pink)](https://docs.uniswap.org/contracts/permit2/overview)
@@ -78,7 +81,7 @@ sequenceDiagram
 
 ## 🚀 Deployed Contracts
 
-### Testnets
+### Validators (Bridge Contracts)
 
 | Chain | Contract Address | Explorer |
 |-------|------------------|----------|
@@ -87,7 +90,20 @@ sequenceDiagram
 | **Base Sepolia** | `0x07b091cC0eef5b03A41eB4bDD059B388cd3560D1` | [Sourcify](https://sourcify.dev/server/repo-ui/84532/0x07b091cC0eef5b03A41eB4bDD059B388cd3560D1) |
 | **Arbitrum Sepolia** | `0xbD57b37FEf0fda7151a0C0BdA957aE37BD84ab6B` | [Sourcify](https://sourcify.dev/server/repo-ui/421614/0xbD57b37FEf0fda7151a0C0BdA957aE37BD84ab6B) |
 
+### OFT Tokens (LayerZero OFT)
+
+| Network | Contract Address | Block Explorer |
+|---------|------------------|----------------|
+| **Sepolia** | `0x07b091cC0eef5b03A41eB4bDD059B388cd3560D1` | [View on Etherscan](https://sepolia.etherscan.io/address/0x07b091cC0eef5b03A41eB4bDD059B388cd3560D1#code) |
+| **Optimism Sepolia** | `0x4cd092a9d4623Fa16411F65d0339B5815895Ca24` | [View on Optimism Etherscan](https://sepolia-optimism.etherscan.io/address/0x4cd092a9d4623Fa16411F65d0339B5815895Ca24#code) |
+| **Base Sepolia** | `0x004690Ee41C0Dd2AcEf094D01b93b60aa9a06bb9` | [View on Basescan](https://sepolia.basescan.org/address/0x004690Ee41C0Dd2AcEf094D01b93b60aa9a06bb9#code) |
+| **Arbitrum Sepolia** | `0x004690Ee41C0Dd2AcEf094D01b93b60aa9a06bb9` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x004690Ee41C0Dd2AcEf094D01b93b60aa9a06bb9#code) |
+
 All contracts are **verified** and **production-ready** ✅
+
+### ✅ Tested & Working
+- **Sepolia → Base Sepolia** - Fully tested and working
+- See [TEST_RESULTS.md](./TEST_RESULTS.md) for detailed test results
 
 ## 📋 How It Works
 
@@ -197,15 +213,22 @@ cp .env.example .env
 
 ### Test the Bridge
 ```bash
-# Bridge from Sepolia to Base
+# Bridge from Sepolia to Base (TESTED & WORKING ✅)
 pnpm run bridge-gasless
 
 # Bridge from OP Sepolia to Sepolia
 pnpm run bridge-from-op
+
+# Bridge from Arbitrum Sepolia to Sepolia
+pnpm run bridge-from-arbitrum
 ```
+
+**See [TEST_RESULTS.md](./TEST_RESULTS.md) for complete test documentation.**
 
 ## 📖 Documentation
 
+- [**✅ Successful Tests**](./SUCCESSFUL_TESTS.md) - **Multiple validated tests with TX links** ⭐
+- [**📊 Final Test Results**](./FINAL_TEST_RESULTS.md) - Complete test results and demo guide
 - [Sequence Diagram](./SEQUENCE_DIAGRAM.md) - Complete flow visualization
 - [Contract Source](./contracts/chainlink_permit2.sol) - Smart contract code
 - [Test Scripts](./test/) - Working examples

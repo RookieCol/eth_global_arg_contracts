@@ -70,7 +70,36 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: {
       sepolia: process.env.ETHERSCAN_API_KEY || '',
+      optimismSepolia: process.env.OPTIMISM_ETHERSCAN_API_KEY || 'PLACEHOLDER',
+      baseSepolia: process.env.BASESCAN_API_KEY || 'PLACEHOLDER',
+      arbitrumSepolia: process.env.ARBISCAN_API_KEY || 'PLACEHOLDER',
     },
+    customChains: [
+      {
+        network: "optimismSepolia",
+        chainId: 11155420,
+        urls: {
+          apiURL: "https://api-sepolia-optimistic.etherscan.io/api",
+          browserURL: "https://sepolia-optimism.etherscan.io"
+        }
+      },
+      {
+        network: "baseSepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org"
+        }
+      },
+      {
+        network: "arbitrumSepolia",
+        chainId: 421614,
+        urls: {
+          apiURL: "https://api-sepolia.arbiscan.io/api",
+          browserURL: "https://sepolia.arbiscan.io"
+        }
+      }
+    ]
   },
 };
 

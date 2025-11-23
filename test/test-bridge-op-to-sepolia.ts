@@ -5,8 +5,8 @@ import { parseUnits, getAddress, type Address } from "viem";
 const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as Address;
 
 // Contract addresses
-const OP_SEPOLIA_VALIDATOR = process.env.OP_VALIDATOR_ADDRESS || "0x68cf7E02984eC410F785fE14C47D5af2b2b87f06" as Address; // NEW VALIDATOR
-const OP_SEPOLIA_OFT = process.env.OP_OFT_ADDRESS || "0x4cd092a9d4623Fa16411F65d0339B5815895Ca24" as Address; // OP Sepolia OFT
+const OP_SEPOLIA_VALIDATOR = process.env.OP_VALIDATOR_ADDRESS || "0x68cf7E02984eC410F785fE14C47D5af2b2b87f06" as Address;
+const OP_SEPOLIA_OFT = process.env.OP_OFT_ADDRESS || "0x4cd092a9d4623Fa16411F65d0339B5815895Ca24" as Address; // OFT en OP Sepolia
 
 // LayerZero Endpoint IDs (V2)
 const ENDPOINT_IDS = {

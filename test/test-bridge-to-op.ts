@@ -5,8 +5,8 @@ import { parseUnits, getAddress, type Address } from "viem";
 const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as Address;
 
 // Contract addresses
-const OP_SEPOLIA_VALIDATOR = process.env.OP_VALIDATOR_ADDRESS || "0x68cf7E02984eC410F785fE14C47D5af2b2b87f06" as Address; // NEW VALIDATOR
-const OP_SEPOLIA_OFT = process.env.OP_OFT_ADDRESS || "0x4cd092a9d4623Fa16411F65d0339B5815895Ca24" as Address; // OP Sepolia OFT
+const VALIDATOR_ADDRESS = process.env.VALIDATOR_ADDRESS || "0xd3605455441B7bF57489E05d6b1b678e269BDE3F" as Address;
+const OFT_TOKEN_ADDRESS = process.env.OFT_TOKEN_ADDRESS || "0x07b091cC0eef5b03A41eB4bDD059B388cd3560D1" as Address;
 
 // LayerZero Endpoint IDs (V2)
 const ENDPOINT_IDS = {
@@ -17,7 +17,7 @@ const ENDPOINT_IDS = {
 // EIP-712 types for Permit2 SignatureTransfer
 const PERMIT2_SIGNATURE_DOMAIN = {
   name: "Permit2",
-  chainId: 11155420, // Optimism Sepolia
+  chainId: 11155111, // Sepolia
   verifyingContract: PERMIT2_ADDRESS,
 } as const;
 
@@ -34,16 +34,16 @@ const PERMIT_TRANSFER_FROM_TYPE = [
 ] as const;
 
 // Source and destination
-const SOURCE_CHAIN_NAME = "Optimism Sepolia";
-const DESTINATION_EID = ENDPOINT_IDS.sepolia;
-const DESTINATION_CHAIN_NAME = "Sepolia";
+const SOURCE_CHAIN_NAME = "Sepolia";
+const DESTINATION_EID = ENDPOINT_IDS.optimismSepolia;
+const DESTINATION_CHAIN_NAME = "Optimism Sepolia";
 
 async function main() {
   console.log(`🌉 Testing receiveAndBridgeGasless: ${SOURCE_CHAIN_NAME} → ${DESTINATION_CHAIN_NAME}\n`);
 
   const { viem } = await network.connect({
-    network: "optimism-sepolia",
-    chainType: "op",
+    network: "sepolia",
+    chainType: "l1",
   });
 
   const publicClient = await viem.getPublicClient();
@@ -51,12 +51,12 @@ async function main() {
   const owner = walletClient.account;
 
   console.log("👤 Owner:", owner.address);
-  console.log("📝 Validator contract:", OP_SEPOLIA_VALIDATOR);
-  console.log("💰 OFT Token:", OP_SEPOLIA_OFT);
+  console.log("📝 Validator contract:", VALIDATOR_ADDRESS);
+  console.log("💰 OFT Token:", OFT_TOKEN_ADDRESS);
   console.log(`🌐 Source chain: ${SOURCE_CHAIN_NAME}`);
   console.log(`🎯 Destination chain: ${DESTINATION_CHAIN_NAME}\n`);
 
-  // Recipient on destination chain (Sepolia)
+  // Recipient on destination chain (OP Sepolia)
   const destinationAddress: Address = owner.address;
 
   // Amount to bridge
@@ -75,7 +75,7 @@ async function main() {
   ] as const;
 
   const balance = await publicClient.readContract({
-    address: OP_SEPOLIA_OFT as Address,
+    address: OFT_TOKEN_ADDRESS as Address,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [owner.address],
@@ -128,10 +128,10 @@ async function main() {
 
   const permit = {
     permitted: {
-      token: OP_SEPOLIA_OFT as Address,
+      token: OFT_TOKEN_ADDRESS as Address,
       amount: amount,
     },
-    spender: getAddress(OP_SEPOLIA_VALIDATOR) as Address,
+    spender: getAddress(VALIDATOR_ADDRESS) as Address,
     nonce: nonce,
     deadline: deadline,
   };
@@ -219,11 +219,11 @@ async function main() {
   ] as const;
 
   const fee = await publicClient.readContract({
-    address: getAddress(OP_SEPOLIA_VALIDATOR) as Address,
+    address: getAddress(VALIDATOR_ADDRESS) as Address,
     abi: validatorAbi,
     functionName: "quoteBridge",
     args: [
-      OP_SEPOLIA_OFT as Address,
+      OFT_TOKEN_ADDRESS as Address,
       DESTINATION_EID,
       destinationAddress as Address,
       amount,
@@ -238,7 +238,7 @@ async function main() {
   console.log("\n🚀 Executing receiveAndBridgeGasless (GASLESS - NO APPROVE NEEDED!)...");
 
   const txHash = await walletClient.writeContract({
-    address: getAddress(OP_SEPOLIA_VALIDATOR) as Address,
+    address: getAddress(VALIDATOR_ADDRESS) as Address,
     abi: validatorAbi,
     functionName: "receiveAndBridgeGasless",
     args: [
