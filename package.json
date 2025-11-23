@@ -8,6 +8,7 @@
     "permit2:direct": "npx hardhat run test/test-permit2-direct-call.ts --network sepolia",
     "receive-tokens": "npx hardhat run test/test-receive-tokens.ts --network sepolia",
     "bridge-lz": "npx hardhat run test/test-bridge-lz.ts --network sepolia",
+    "bridge-gasless": "npx hardhat run test/test-bridge-gasless.ts --network sepolia",
     "deploy": "npx hardhat ignition deploy ignition/modules/chainlink_permit2.ts --network sepolia",
     "verify": "npx hardhat verify --network sepolia"
   },

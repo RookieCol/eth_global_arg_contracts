@@ -82,11 +82,42 @@ interface IAllowanceTransfer {
     ) external;
 }
 
+/// @notice Interface for Permit2 SignatureTransfer (gasless, no approve needed)
+interface ISignatureTransfer {
+    struct TokenPermissions {
+        address token;
+        uint256 amount;
+    }
+
+    struct PermitTransferFrom {
+        TokenPermissions permitted;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct SignatureTransferDetails {
+        address to;
+        uint256 requestedAmount;
+    }
+
+    /// @notice Transfer tokens using a signed permit (no prior approve needed)
+    function permitTransferFrom(
+        PermitTransferFrom calldata permit,
+        SignatureTransferDetails calldata transferDetails,
+        address owner,
+        bytes calldata signature
+    ) external;
+}
+
 /// @notice Valida firmas Permit2 sin transferir tokens
 contract Permit2TransferValidator {
     /// @notice Dirección oficial de Permit2
     IAllowanceTransfer public constant PERMIT2 =
         IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    
+    /// @notice SignatureTransfer interface (same address as Permit2)
+    ISignatureTransfer public constant PERMIT2_SIGNATURE =
+        ISignatureTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
     event PermitValidated(
         address indexed owner,
@@ -246,7 +277,7 @@ contract Permit2TransferValidator {
      * @param dstAddress Recipient address on destination chain
      * @param minAmountLD Minimum amount to receive on destination (slippage protection)
      * @param extraOptions LayerZero execution options (gas limits, etc)
-     */
+     */ 
     function receiveAndBridge(
         IAllowanceTransfer.PermitSingle calldata permitSingle,
         bytes calldata signature,
@@ -303,7 +334,8 @@ contract Permit2TransferValidator {
                 amount,
                 minAmountLD,
                 extraOptions,
-                owner
+                owner,
+                msg.value
             );
 
             emit TokensBridged(
@@ -318,6 +350,68 @@ contract Permit2TransferValidator {
     }
 
     /**
+     * @notice GASLESS: Validates Permit2 signature, receives tokens, and bridges them via LayerZero
+     * @dev Uses SignatureTransfer - NO PRIOR APPROVE NEEDED! Fully gasless for user.
+     * @param permit Permit data (SignatureTransfer)
+     * @param owner Address that signed the permit
+     * @param signature EIP-712 signature from owner
+     * @param dstEid Destination chain endpoint ID (LayerZero)
+     * @param dstAddress Recipient address on destination chain
+     * @param minAmountLD Minimum amount to receive on destination (slippage protection)
+     * @param extraOptions LayerZero execution options (gas limits, etc)
+     */
+    function receiveAndBridgeGasless(
+        ISignatureTransfer.PermitTransferFrom calldata permit,
+        address owner,
+        bytes calldata signature,
+        uint32 dstEid,
+        address dstAddress,
+        uint256 minAmountLD,
+        bytes calldata extraOptions
+    ) external payable {
+        require(permit.permitted.amount > 0, "Zero amount");
+        require(dstAddress != address(0), "Invalid destination address");
+        require(permit.permitted.token != address(0), "Invalid token");
+
+        uint256 amount = permit.permitted.amount;
+
+        // 1. Transfer tokens directly from owner to this contract using SignatureTransfer
+        // NO PRIOR APPROVE NEEDED!
+        PERMIT2_SIGNATURE.permitTransferFrom(
+            permit,
+            ISignatureTransfer.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: amount
+            }),
+            owner,
+            signature
+        );
+
+        emit TokensTransferred(owner, address(this), permit.permitted.token, uint160(amount));
+
+        // 2. Bridge tokens to destination chain via LayerZero OFT
+        {
+            IOFT oft = IOFT(permit.permitted.token);
+
+            // Approve OFT to spend tokens from this contract
+            oft.approve(address(oft), amount);
+
+            bytes32 messageId = _sendViaLayerZero(
+                oft,
+                dstEid,
+                dstAddress,
+                amount,
+                minAmountLD,
+                extraOptions,
+                owner, // Refund address
+                msg.value // Native fee
+            );
+
+            emit TokensBridged(owner, permit.permitted.token, dstEid, dstAddress, amount, messageId);
+        }
+    }
+
+    /**
      * @notice Internal helper to send via LayerZero (reduces stack depth)
      */
     function _sendViaLayerZero(
@@ -327,7 +421,8 @@ contract Permit2TransferValidator {
         uint256 amount,
         uint256 minAmountLD,
         bytes calldata extraOptions,
-        address refundAddress
+        address refundAddress,
+        uint256 nativeFee
     ) internal returns (bytes32) {
         // Prepare SendParam
         IOFT.SendParam memory sendParam = IOFT.SendParam({
@@ -342,12 +437,12 @@ contract Permit2TransferValidator {
 
         // Prepare fee
         IOFT.MessagingFee memory fee = IOFT.MessagingFee({
-            nativeFee: msg.value,
+            nativeFee: nativeFee,
             lzTokenFee: 0
         });
 
         // Send
-        (IOFT.MessagingReceipt memory msgReceipt, ) = oft.send{value: msg.value}(
+        (IOFT.MessagingReceipt memory msgReceipt, ) = oft.send{value: nativeFee}(
             sendParam,
             fee,
             refundAddress
