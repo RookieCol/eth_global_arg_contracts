@@ -1,5 +1,5 @@
 import { network } from "hardhat";
-import { parseUnits, getAddress, keccak256, toHex, type Address } from "viem";
+import { parseUnits, getAddress, type Address } from "viem";
 
 // Official Permit2 address
 const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as Address;
@@ -58,7 +58,7 @@ async function main() {
   console.log(`🎯 Destination chain: ${DESTINATION_CHAIN_NAME}\n`);
 
   // Recipient on destination chain
-  const destinationAddress = owner.address;
+  const destinationAddress: Address = owner.address;
 
   // Amount to bridge
   const amount = parseUnits("1", 6); // 1 token (assuming 6 decimals like USDC)
@@ -76,7 +76,7 @@ async function main() {
   ] as const;
 
   const balance = await publicClient.readContract({
-    address: OFT_TOKEN_ADDRESS,
+    address: OFT_TOKEN_ADDRESS as Address,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [owner.address],
@@ -130,10 +130,10 @@ async function main() {
 
   const permit = {
     permitted: {
-      token: OFT_TOKEN_ADDRESS,
+      token: OFT_TOKEN_ADDRESS as Address,
       amount: amount,
     },
-    spender: getAddress(VALIDATOR_ADDRESS),
+    spender: getAddress(VALIDATOR_ADDRESS) as Address,
     nonce: nonce,
     deadline: deadline,
   };
@@ -221,13 +221,13 @@ async function main() {
   ] as const;
 
   const fee = await publicClient.readContract({
-    address: getAddress(VALIDATOR_ADDRESS),
+    address: getAddress(VALIDATOR_ADDRESS) as Address,
     abi: validatorAbi,
     functionName: "quoteBridge",
     args: [
-      OFT_TOKEN_ADDRESS,
+      OFT_TOKEN_ADDRESS as Address,
       DESTINATION_EID,
-      destinationAddress,
+      destinationAddress as Address,
       amount,
       amount, // minAmountLD = amount (no slippage tolerance)
       extraOptions as `0x${string}`,
@@ -240,22 +240,22 @@ async function main() {
   console.log("\n🚀 Executing receiveAndBridgeGasless (GASLESS - NO APPROVE NEEDED!)...");
 
   const txHash = await walletClient.writeContract({
-    address: getAddress(VALIDATOR_ADDRESS),
+    address: getAddress(VALIDATOR_ADDRESS) as Address,
     abi: validatorAbi,
     functionName: "receiveAndBridgeGasless",
     args: [
       {
         permitted: {
-          token: permit.permitted.token,
+          token: permit.permitted.token as Address,
           amount: permit.permitted.amount,
         },
         nonce: permit.nonce,
         deadline: permit.deadline,
       },
-      owner.address,
+      owner.address as Address,
       signature,
       DESTINATION_EID,
-      destinationAddress,
+      destinationAddress as Address,
       amount, // minAmountLD
       extraOptions as `0x${string}`,
     ],
