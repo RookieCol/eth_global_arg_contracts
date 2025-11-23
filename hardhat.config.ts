@@ -53,6 +53,18 @@ const config: HardhatUserConfig = {
       url: process.env.OPTIMISM_SEPOLIA_URL || "https://sepolia.optimism.io",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
+    "base-sepolia": {
+      type: "http",
+      chainType: "op", // Base is OP Stack
+      url: process.env.BASE_SEPOLIA_URL || "https://sepolia.base.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    "arbitrum-sepolia": {
+      type: "http",
+      chainType: "l1", // Arbitrum uses L1 chain type
+      url: process.env.ARBITRUM_SEPOLIA_URL || "https://sepolia-rollup.arbitrum.io/rpc",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   // @ts-ignore - etherscan config is supported by hardhat-verify plugin
   etherscan: {
