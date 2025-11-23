@@ -6,7 +6,7 @@ const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as Address;
 
 // Example addresses (replace with your deployed contracts)
 const OFT_TOKEN_ADDRESS = process.env.OFT_TOKEN_ADDRESS || "0x07b091cC0eef5b03A41eB4bDD059B388cd3560D1" as Address;
-const VALIDATOR_ADDRESS = process.env.VALIDATOR_ADDRESS || "0x762579DFD5e62Ab797282dc5495A92b8b6E7cB25" as Address;
+const VALIDATOR_ADDRESS = process.env.VALIDATOR_ADDRESS || "0xd3605455441B7bF57489E05d6b1b678e269BDE3F" as Address;
 
 // LayerZero Endpoint IDs (V2)
 const ENDPOINT_IDS = {
