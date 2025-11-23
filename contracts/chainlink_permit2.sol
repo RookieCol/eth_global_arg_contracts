@@ -1,6 +1,58 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+// Interface for OFT bridge functionality
+interface IOFT {
+    /// @notice Struct for sending parameters
+    struct SendParam {
+        uint32 dstEid;
+        bytes32 to;
+        uint256 amountLD;
+        uint256 minAmountLD;
+        bytes extraOptions;
+        bytes composeMsg;
+        bytes oftCmd;
+    }
+
+    /// @notice Struct for messaging fee
+    struct MessagingFee {
+        uint256 nativeFee;
+        uint256 lzTokenFee;
+    }
+
+    /// @notice Send tokens cross-chain
+    function send(
+        SendParam calldata _sendParam,
+        MessagingFee calldata _fee,
+        address _refundAddress
+    ) external payable returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt);
+
+    /// @notice Quote for sending tokens
+    function quoteSend(
+        SendParam calldata _sendParam,
+        bool _payInLzToken
+    ) external view returns (MessagingFee memory msgFee);
+
+    /// @notice ERC20 approve
+    function approve(address spender, uint256 amount) external returns (bool);
+    
+    /// @notice ERC20 balanceOf
+    function balanceOf(address account) external view returns (uint256);
+
+    /// @notice Receipt from messaging
+    struct MessagingReceipt {
+        bytes32 guid;
+        uint64 nonce;
+        MessagingFee fee;
+    }
+
+    /// @notice Receipt from OFT transfer
+    struct OFTReceipt {
+        uint256 amountSentLD;
+        uint256 amountReceivedLD;
+    }
+}
+
 /// @notice Interfaz correcta de AllowanceTransfer (Permit2) según Uniswap
 interface IAllowanceTransfer {
     struct PermitDetails {
@@ -48,6 +100,15 @@ contract Permit2TransferValidator {
         address indexed to,
         address indexed token,
         uint160 amount
+    );
+
+    event TokensBridged(
+        address indexed from,
+        address indexed token,
+        uint32 indexed dstEid,
+        address dstAddress,
+        uint256 amount,
+        bytes32 messageId
     );
 
     /**
@@ -125,5 +186,226 @@ contract Permit2TransferValidator {
             permitSingle.details.token,
             amount
         );
+    }
+
+    /**
+     * @notice Validates Permit2 signature and transfers tokens to this contract
+     * @dev This function is used to receive tokens before bridging to another chain
+     * @param permitSingle Permit data (AllowanceTransfer)
+     * @param signature EIP-712 signature from owner
+     * @param owner Address that signed
+     * @param amount Amount to transfer (must be <= permitSingle.details.amount)
+     */
+    function receiveTokensWithPermit(
+        IAllowanceTransfer.PermitSingle calldata permitSingle,
+        bytes calldata signature,
+        address owner,
+        uint160 amount
+    ) external {
+        require(amount > 0, "Zero amount");
+        require(
+            amount <= permitSingle.details.amount,
+            "Amount exceeds permitted"
+        );
+        require(
+            permitSingle.details.token != address(0),
+            "Invalid token"
+        );
+        require(
+            permitSingle.spender == address(this),
+            "Invalid spender"
+        );
+
+        // 1. Validate signature via Permit2
+        PERMIT2.permit(owner, permitSingle, signature);
+
+        // 2. Transfer tokens from owner to this contract
+        PERMIT2.transferFrom(
+            owner,
+            address(this),
+            amount,
+            permitSingle.details.token
+        );
+
+        emit TokensTransferred(
+            owner,
+            address(this),
+            permitSingle.details.token,
+            amount
+        );
+    }
+
+    /**
+     * @notice Validates Permit2 signature, receives tokens, and bridges them via LayerZero
+     * @dev This is the main function for gasless cross-chain transfers
+     * @param permitSingle Permit data (AllowanceTransfer)
+     * @param signature EIP-712 signature from owner
+     * @param owner Address that signed the permit
+     * @param amount Amount to transfer and bridge
+     * @param dstEid Destination chain endpoint ID (LayerZero)
+     * @param dstAddress Recipient address on destination chain
+     * @param minAmountLD Minimum amount to receive on destination (slippage protection)
+     * @param extraOptions LayerZero execution options (gas limits, etc)
+     */
+    function receiveAndBridge(
+        IAllowanceTransfer.PermitSingle calldata permitSingle,
+        bytes calldata signature,
+        address owner,
+        uint160 amount,
+        uint32 dstEid,
+        address dstAddress,
+        uint256 minAmountLD,
+        bytes calldata extraOptions
+    ) external payable {
+        require(amount > 0, "Zero amount");
+        require(dstAddress != address(0), "Invalid destination address");
+        require(
+            amount <= permitSingle.details.amount,
+            "Amount exceeds permitted"
+        );
+        require(
+            permitSingle.details.token != address(0),
+            "Invalid token"
+        );
+        require(
+            permitSingle.spender == address(this),
+            "Invalid spender"
+        );
+
+        // 1. Validate signature and transfer tokens to this contract
+        PERMIT2.permit(owner, permitSingle, signature);
+        PERMIT2.transferFrom(
+            owner,
+            address(this),
+            amount,
+            permitSingle.details.token
+        );
+
+        emit TokensTransferred(
+            owner,
+            address(this),
+            permitSingle.details.token,
+            amount
+        );
+
+        // 2. Bridge tokens via LayerZero (using scope to reduce stack depth)
+        {
+            IOFT oft = IOFT(permitSingle.details.token);
+            
+            // Approve OFT contract to spend/burn tokens
+            oft.approve(permitSingle.details.token, amount);
+            
+            // Send via LayerZero OFT
+            bytes32 guid = _sendViaLayerZero(
+                oft,
+                dstEid,
+                dstAddress,
+                amount,
+                minAmountLD,
+                extraOptions,
+                owner
+            );
+
+            emit TokensBridged(
+                owner,
+                permitSingle.details.token,
+                dstEid,
+                dstAddress,
+                amount,
+                guid
+            );
+        }
+    }
+
+    /**
+     * @notice Internal helper to send via LayerZero (reduces stack depth)
+     */
+    function _sendViaLayerZero(
+        IOFT oft,
+        uint32 dstEid,
+        address dstAddress,
+        uint256 amount,
+        uint256 minAmountLD,
+        bytes calldata extraOptions,
+        address refundAddress
+    ) internal returns (bytes32) {
+        // Prepare SendParam
+        IOFT.SendParam memory sendParam = IOFT.SendParam({
+            dstEid: dstEid,
+            to: bytes32(uint256(uint160(dstAddress))),
+            amountLD: amount,
+            minAmountLD: minAmountLD,
+            extraOptions: extraOptions,
+            composeMsg: "",
+            oftCmd: ""
+        });
+
+        // Prepare fee
+        IOFT.MessagingFee memory fee = IOFT.MessagingFee({
+            nativeFee: msg.value,
+            lzTokenFee: 0
+        });
+
+        // Send
+        (IOFT.MessagingReceipt memory msgReceipt, ) = oft.send{value: msg.value}(
+            sendParam,
+            fee,
+            refundAddress
+        );
+
+        return msgReceipt.guid;
+    }
+
+    /**
+     * @notice Quote the fee for bridging tokens via LayerZero
+     * @param token OFT token address
+     * @param dstEid Destination chain endpoint ID
+     * @param dstAddress Recipient address on destination chain
+     * @param amount Amount to bridge
+     * @param minAmountLD Minimum amount (for slippage)
+     * @param extraOptions LayerZero execution options
+     * @return nativeFee Required fee in native token
+     */
+    function quoteBridge(
+        address token,
+        uint32 dstEid,
+        address dstAddress,
+        uint256 amount,
+        uint256 minAmountLD,
+        bytes calldata extraOptions
+    ) external view returns (uint256 nativeFee) {
+        IOFT oft = IOFT(token);
+        
+        bytes32 toAddress = bytes32(uint256(uint160(dstAddress)));
+        IOFT.SendParam memory sendParam = IOFT.SendParam({
+            dstEid: dstEid,
+            to: toAddress,
+            amountLD: amount,
+            minAmountLD: minAmountLD,
+            extraOptions: extraOptions,
+            composeMsg: "",
+            oftCmd: ""
+        });
+
+        IOFT.MessagingFee memory fee = oft.quoteSend(sendParam, false);
+        return fee.nativeFee;
+    }
+
+    /**
+     * @notice Withdraw tokens from contract (emergency or after receiving)
+     * @param token Token address
+     * @param to Recipient address
+     * @param amount Amount to withdraw
+     */
+    function withdrawTokens(
+        address token,
+        address to,
+        uint256 amount
+    ) external {
+        require(msg.sender == address(this) || to == msg.sender, "Not authorized");
+        IOFT oft = IOFT(token);
+        require(oft.balanceOf(address(this)) >= amount, "Insufficient balance");
+        oft.approve(to, amount);
+        // Transfer would need to be done by the token contract
     }
 }

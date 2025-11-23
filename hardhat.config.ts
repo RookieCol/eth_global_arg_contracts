@@ -12,6 +12,13 @@ const config: HardhatUserConfig = {
     profiles: {
       default: {
         version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true, // Fix "Stack too deep" error
+        },
       },
       production: {
         version: "0.8.28",
@@ -20,6 +27,7 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: 200,
           },
+          viaIR: true,
         },
       },
     },
@@ -37,6 +45,12 @@ const config: HardhatUserConfig = {
       type: "http",
       chainType: "l1",
       url: process.env.ALCHEMY_SEPOLIA_URL || '',
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    "optimism-sepolia": {
+      type: "http",
+      chainType: "op",
+      url: process.env.OPTIMISM_SEPOLIA_URL || "https://sepolia.optimism.io",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
